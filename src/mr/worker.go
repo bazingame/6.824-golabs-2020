@@ -5,7 +5,6 @@ import "log"
 import "net/rpc"
 import "hash/fnv"
 
-
 //
 // Map functions return a slice of KeyValue.
 //
@@ -24,7 +23,6 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-
 //
 // main/mrworker.go calls this function.
 //
@@ -34,12 +32,21 @@ func Worker(mapf func(string, string) []KeyValue,
 	// Your worker implementation here.
 
 	// uncomment to send the Example RPC to the master.
-	// CallExample()
+	//CallExample()
 
+	getJob()
+}
+
+func getJob() {
+	args := GetJobArgs{}
+	reply := GetJobReply{}
+
+	call("Master.GetJob", &args, &reply)
+	fmt.Printf(reply.FileName)
 }
 
 //
-// example function to show how to make an RPC call to the master.
+// example function to show how to make an RPC call to the master.`
 //
 // the RPC argument and reply types are defined in rpc.go.
 //

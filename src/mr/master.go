@@ -1,15 +1,27 @@
 package mr
 
-import "log"
+import (
+	"fmt"
+	"log"
+	"sync"
+)
 import "net"
 import "os"
 import "net/rpc"
 import "net/http"
 
+type MapTaskStatus int64
+
+const (
+	MapTaskStatusPrepare MapTaskStatus = iota + 1
+	MapTaskStatusProcessing
+	MapTaskStatusDone
+)
 
 type Master struct {
 	// Your definitions here.
-
+	mu          sync.Mutex
+	filesStatus map[string]MapTaskStatus
 }
 
 // Your code here -- RPC handlers for the worker to call.
@@ -24,6 +36,21 @@ func (m *Master) Example(args *ExampleArgs, reply *ExampleReply) error {
 	return nil
 }
 
+func (m *Master) GetJob(args *GetJobArgs, reply *GetJobReply) error {
+	fmt.Println("get req")
+	for fName, s := range m.filesStatus {
+		if s == MapTaskStatusPrepare {
+			reply = &GetJobReply{
+				FileName: fName,
+			}
+			s = MapTaskStatusProcessing
+			fmt.Println("returned : ", fName)
+			return nil
+		}
+	}
+	fmt.Println("returned nil")
+	return nil
+}
 
 //
 // start a thread that listens for RPCs from worker.go
@@ -46,12 +73,12 @@ func (m *Master) server() {
 // if the entire job has finished.
 //
 func (m *Master) Done() bool {
-	ret := false
-
-	// Your code here.
-
-
-	return ret
+	for _, status := range m.filesStatus {
+		if status != MapTaskStatusDone {
+			return false
+		}
+	}
+	return true
 }
 
 //
@@ -61,9 +88,13 @@ func (m *Master) Done() bool {
 //
 func MakeMaster(files []string, nReduce int) *Master {
 	m := Master{}
+	m.filesStatus = make(map[string]MapTaskStatus)
 
 	// Your code here.
-
+	for _, f := range files {
+		m.filesStatus[f] = MapTaskStatusPrepare
+	}
+	fmt.Println(m.filesStatus)
 
 	m.server()
 	return &m
