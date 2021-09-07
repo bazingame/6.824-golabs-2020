@@ -24,11 +24,11 @@ type ExampleReply struct {
 
 // Add your RPC definitions here.
 
-type GetJobArgs struct {
-
+type GetTaskArgs struct {
 }
 
-type GetJobReply struct {
+type GetTaskReply struct {
+	Num      int64
 	FileName string
 }
 

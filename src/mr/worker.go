@@ -1,6 +1,11 @@
 package mr
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+)
 import "log"
 import "net/rpc"
 import "hash/fnv"
@@ -26,23 +31,49 @@ func ihash(key string) int {
 //
 // main/mrworker.go calls this function.
 //
-func Worker(mapf func(string, string) []KeyValue,
-	reducef func(string, []string) string) {
+func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string) string) {
 
-	// Your worker implementation here.
+	taskInfo := getJob()
+	content := readFile(taskInfo.FileName)
+	kva := mapf(taskInfo.FileName, string(content))
+	saveIntermediateFile(taskInfo, kva)
 
-	// uncomment to send the Example RPC to the master.
-	//CallExample()
-
-	getJob()
 }
 
-func getJob() {
-	args := GetJobArgs{}
-	reply := GetJobReply{}
+func saveIntermediateFile(taskInfo GetTaskReply, kva []KeyValue) {
+	log.Println("get kva:", kva)
 
+	resStr, err := json.Marshal(kva)
+	if err != nil {
+		panic(err)
+	}
+	intermediateFilename := fmt.Sprintf("mr-out-%d", taskInfo.Num)
+	ofile, _ := os.Create(intermediateFilename)
+	defer ofile.Close()
+	_, err = fmt.Fprint(ofile, resStr)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func readFile(filename string) []byte {
+	file, err := os.Open(filename)
+	defer file.Close()
+	if err != nil {
+		log.Fatalf("cannot open %v", filename)
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatalf("cannot read %v", filename)
+	}
+	return content
+}
+
+func getJob() GetTaskReply {
+	args := GetTaskArgs{}
+	reply := GetTaskReply{}
 	call("Master.GetJob", &args, &reply)
-	fmt.Printf(reply.FileName)
+	return reply
 }
 
 //

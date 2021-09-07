@@ -1,7 +1,6 @@
 package mr
 
 import (
-	"fmt"
 	"log"
 	"sync"
 )
@@ -18,10 +17,15 @@ const (
 	MapTaskStatusDone
 )
 
+type Task struct {
+	FileName string
+	Status   MapTaskStatus
+}
+
 type Master struct {
 	// Your definitions here.
-	mu          sync.Mutex
-	filesStatus map[string]MapTaskStatus
+	mu    sync.Mutex
+	tasks []Task
 }
 
 // Your code here -- RPC handlers for the worker to call.
@@ -36,19 +40,15 @@ func (m *Master) Example(args *ExampleArgs, reply *ExampleReply) error {
 	return nil
 }
 
-func (m *Master) GetJob(args *GetJobArgs, reply *GetJobReply) error {
-	fmt.Println("get req")
-	for fName, s := range m.filesStatus {
-		if s == MapTaskStatusPrepare {
-			reply = &GetJobReply{
-				FileName: fName,
-			}
-			s = MapTaskStatusProcessing
-			fmt.Println("returned : ", fName)
+func (m *Master) GetJob(args *GetTaskArgs, reply *GetTaskReply) error {
+	for i, task := range m.tasks {
+		if task.Status == MapTaskStatusPrepare {
+			reply.FileName = task.FileName
+			reply.Num = int64(i)
+			task.Status = MapTaskStatusProcessing
 			return nil
 		}
 	}
-	fmt.Println("returned nil")
 	return nil
 }
 
@@ -73,8 +73,8 @@ func (m *Master) server() {
 // if the entire job has finished.
 //
 func (m *Master) Done() bool {
-	for _, status := range m.filesStatus {
-		if status != MapTaskStatusDone {
+	for _, task := range m.tasks {
+		if task.Status != MapTaskStatusDone {
 			return false
 		}
 	}
@@ -88,13 +88,16 @@ func (m *Master) Done() bool {
 //
 func MakeMaster(files []string, nReduce int) *Master {
 	m := Master{}
-	m.filesStatus = make(map[string]MapTaskStatus)
+	m.tasks = make([]Task, 0)
 
 	// Your code here.
 	for _, f := range files {
-		m.filesStatus[f] = MapTaskStatusPrepare
+		m.tasks = append(m.tasks, Task{
+			FileName: f,
+			Status:   MapTaskStatusPrepare,
+		})
 	}
-	fmt.Println(m.filesStatus)
+	log.Println("get task:", m.tasks)
 
 	m.server()
 	return &m
