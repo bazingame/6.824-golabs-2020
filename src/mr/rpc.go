@@ -24,12 +24,37 @@ type ExampleReply struct {
 
 // Add your RPC definitions here.
 
+type FinishTaskArgs struct {
+	TaskType int64
+	TaskNum  int64
+}
+
+type FinishTaskReply struct {
+}
+
 type GetTaskArgs struct {
 }
 
-type GetTaskReply struct {
+const (
+	TaskTypeMap int64 = iota + 1
+	TaskTypeReduce
+)
+
+type MapTaskInfo struct {
 	Num      int64
 	FileName string
+}
+
+type ReduceTaskInfo struct {
+	Num      int64
+	FileName string
+}
+
+type GetTaskReply struct {
+	TaskType       int64
+	TaskNum        int64
+	MapTaskInfo    *MapTaskInfo
+	ReduceTaskInfo *ReduceTaskInfo
 }
 
 // Cook up a unique-ish UNIX-domain socket name

@@ -32,22 +32,36 @@ func ihash(key string) int {
 // main/mrworker.go calls this function.
 //
 func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string) string) {
+	for taskInfo := getJob(); taskInfo.TaskType != 0; taskInfo = getJob() {
+		log.Printf("get one job from master %v %v ...... \n", taskInfo.TaskType, taskInfo.TaskNum)
+		if taskInfo.TaskType == TaskTypeMap {
+			handleMapTask(mapf, taskInfo)
+		} else if taskInfo.TaskType == TaskTypeReduce {
+			handleReduceTask(reducef, taskInfo)
+		}
+		finishJob(taskInfo)
+	}
+}
 
-	taskInfo := getJob()
-	content := readFile(taskInfo.FileName)
-	kva := mapf(taskInfo.FileName, string(content))
-	saveIntermediateFile(taskInfo, kva)
+func handleMapTask(mapf func(string, string) []KeyValue, taskInfo GetTaskReply) {
+	log.Printf("handling map task %v ...... \n", taskInfo.MapTaskInfo.FileName)
+	content := readFile(taskInfo.MapTaskInfo.FileName)
+	kva := mapf(taskInfo.MapTaskInfo.FileName, string(content))
+	saveIntermediateFile(taskInfo.TaskNum, kva)
+	log.Printf("map task %v done \n", taskInfo.MapTaskInfo.FileName)
+}
+
+func handleReduceTask(reducef func(string, []string) string, taskInfo GetTaskReply) {
 
 }
 
-func saveIntermediateFile(taskInfo GetTaskReply, kva []KeyValue) {
-	log.Println("get kva:", kva)
-
+func saveIntermediateFile(n int64, kva []KeyValue) {
+	log.Printf("get %d kva:", len(kva))
 	resStr, err := json.Marshal(kva)
 	if err != nil {
 		panic(err)
 	}
-	intermediateFilename := fmt.Sprintf("mr-out-%d", taskInfo.Num)
+	intermediateFilename := fmt.Sprintf("mr-out-%d", n)
 	ofile, _ := os.Create(intermediateFilename)
 	defer ofile.Close()
 	_, err = fmt.Fprint(ofile, resStr)
@@ -70,9 +84,22 @@ func readFile(filename string) []byte {
 }
 
 func getJob() GetTaskReply {
+	fmt.Println("worker request job--------------")
 	args := GetTaskArgs{}
 	reply := GetTaskReply{}
 	call("Master.GetJob", &args, &reply)
+	return reply
+}
+
+func finishJob(taskInfo GetTaskReply) FinishTaskReply {
+	args := FinishTaskArgs{
+		TaskType: taskInfo.TaskType,
+		TaskNum:  taskInfo.TaskNum,
+	}
+	log.Printf("finish job : %v : %v", taskInfo.TaskType, taskInfo.TaskNum)
+
+	reply := FinishTaskReply{}
+	call("Master.FinishJob", &args, &reply)
 	return reply
 }
 
