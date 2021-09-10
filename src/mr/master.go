@@ -24,12 +24,14 @@ type MapTask struct {
 }
 
 type ReduceTask struct {
-	FileName string
-	Status   MapTaskStatus
+	//FileName string
+	Status MapTaskStatus
 }
 
 type Master struct {
 	// Your definitions here.
+	nReduce     int
+	nMap        int
 	mu          sync.Mutex
 	mapTasks    []MapTask
 	reduceTasks []ReduceTask
@@ -58,8 +60,6 @@ func (m *Master) FinishJob(args *FinishTaskArgs, reply *FinishTaskReply) error {
 		}
 	}
 
-
-
 	log.Printf("get finish job report: %v : %v", args.TaskType, args.TaskNum)
 	m.showTaskStatus()
 	return nil
@@ -69,18 +69,17 @@ func (m *Master) showTaskStatus() {
 	for _, j := range m.mapTasks {
 		log.Printf("%v status is: %v\n", j.FileName, j.Status)
 	}
-	for _, j := range m.reduceTasks {
-		log.Printf("%v status is: %v\n", j.FileName, j.Status)
+	for i, j := range m.reduceTasks {
+		log.Printf("%v status is: %v\n", i, j.Status)
 	}
 }
 
 func (m *Master) GetJob(args *GetTaskArgs, reply *GetTaskReply) error {
-	fmt.Println("get job called ----------------")
-
 	for i, task := range m.mapTasks {
 		if task.Status == TaskStatusPrepare {
 			mapTask := &MapTaskInfo{
 				FileName: task.FileName,
+				NReduce:  m.nReduce,
 			}
 			reply.TaskType = TaskTypeMap
 			reply.MapTaskInfo = mapTask
@@ -99,9 +98,9 @@ func (m *Master) GetJob(args *GetTaskArgs, reply *GetTaskReply) error {
 	for i, task := range m.reduceTasks {
 		if task.Status == TaskStatusPrepare {
 			reduceTask := &ReduceTaskInfo{
-				Num:      int64(i),
-				FileName: task.FileName,
+				NMap: m.nMap,
 			}
+			reply.TaskNum = int64(i)
 			reply.TaskType = TaskTypeReduce
 			reply.ReduceTaskInfo = reduceTask
 			task.Status = TaskStatusProcessing
@@ -151,22 +150,34 @@ func (m *Master) Done() bool {
 //
 // create a Master.
 // main/mrmaster.go calls this function.
-// nReduce is the number of reduce mapTasks to use.
+// NReduce is the number of reduce mapTasks to use.
 //
 func MakeMaster(files []string, nReduce int) *Master {
-	m := Master{}
+	m := Master{
+		nReduce: nReduce,
+	}
 	m.mapTasks = make([]MapTask, 0)
 
 	// Your code here.
-	log.Println("initiating task....")
+	log.Println("initiating map task....")
+	m.nMap = len(files)
 	for _, f := range files {
 		m.mapTasks = append(m.mapTasks, MapTask{
 			FileName: f,
 			Status:   TaskStatusPrepare,
 		})
-		log.Println("add task:", f)
+		log.Println("add map task:", f)
 	}
-	log.Println("init done....")
+	log.Println("init map task done....")
+
+	log.Println("initiating reduce task....")
+	for i := 0; i < nReduce; i++ {
+		m.reduceTasks = append(m.reduceTasks, ReduceTask{
+			Status: TaskStatusPrepare,
+		})
+		log.Println("add reduce task:", i)
+	}
+	log.Println("init reduce task done....")
 
 	m.server()
 	return &m

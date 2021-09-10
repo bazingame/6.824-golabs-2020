@@ -41,13 +41,12 @@ const (
 )
 
 type MapTaskInfo struct {
-	Num      int64
 	FileName string
+	NReduce  int
 }
 
 type ReduceTaskInfo struct {
-	Num      int64
-	FileName string
+	NMap int
 }
 
 type GetTaskReply struct {
