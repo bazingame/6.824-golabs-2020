@@ -45,7 +45,7 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 				defer mapWg.Done()
 				handleMapTask(mapf, taskInfo)
 			}()
-		} else if taskInfo.TaskType == TaskTypeMapDispatchedOver {
+		} else if taskInfo.TaskType.In(TaskTypeMapDispatchedOver, TaskTypeReduce, TaskTypeReduceDispatchedOver) {
 			break
 		}
 		//time.Sleep(1 * time.Second)

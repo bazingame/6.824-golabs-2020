@@ -37,6 +37,15 @@ type GetTaskArgs struct {
 
 type TaskType int64
 
+func (t TaskType) In(tt ...TaskType) bool {
+	for _, v := range tt {
+		if v == t {
+			return true
+		}
+	}
+	return false
+}
+
 func (t TaskType) ToString() string {
 	switch t {
 	case TaskTypeMap:
