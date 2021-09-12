@@ -25,7 +25,7 @@ type ExampleReply struct {
 // Add your RPC definitions here.
 
 type FinishTaskArgs struct {
-	TaskType int64
+	TaskType TaskType
 	TaskNum  int64
 }
 
@@ -35,9 +35,28 @@ type FinishTaskReply struct {
 type GetTaskArgs struct {
 }
 
+type TaskType int64
+
+func (t TaskType) ToString() string {
+	switch t {
+	case TaskTypeMap:
+		return "Map"
+	case TaskTypeReduce:
+		return "Reduce"
+	case TaskTypeMapDispatchedOver:
+		return "MapDispatchedOver"
+	case TaskTypeReduceDispatchedOver:
+		return "ReduceDispatchedOver"
+
+	}
+	return "error type"
+}
+
 const (
-	TaskTypeMap int64 = iota + 1
+	TaskTypeMap TaskType = iota + 1
 	TaskTypeReduce
+	TaskTypeMapDispatchedOver
+	TaskTypeReduceDispatchedOver
 )
 
 type MapTaskInfo struct {
@@ -50,7 +69,7 @@ type ReduceTaskInfo struct {
 }
 
 type GetTaskReply struct {
-	TaskType       int64
+	TaskType       TaskType
 	TaskNum        int64
 	MapTaskInfo    *MapTaskInfo
 	ReduceTaskInfo *ReduceTaskInfo

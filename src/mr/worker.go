@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"sync"
 )
 import "log"
 import "net/rpc"
@@ -33,15 +34,44 @@ func ihash(key string) int {
 // main/mrworker.go calls this function.
 //
 func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string) string) {
-	for taskInfo := getJob(); taskInfo.TaskType != 0; taskInfo = getJob() {
-		log.Printf("get one job from master %v %v ...... \n", taskInfo.TaskType, taskInfo.TaskNum)
+	var mapWg sync.WaitGroup
+	var reduceWg sync.WaitGroup
+	for {
+		taskInfo := getJob()
+		log.Printf("get one job from master %v ...... \n", taskInfo)
 		if taskInfo.TaskType == TaskTypeMap {
-			handleMapTask(mapf, taskInfo)
-		} else if taskInfo.TaskType == TaskTypeReduce {
-			handleReduceTask(reducef, taskInfo)
+			mapWg.Add(1)
+			go func() {
+				defer mapWg.Done()
+				handleMapTask(mapf, taskInfo)
+			}()
+		} else if taskInfo.TaskType == TaskTypeMapDispatchedOver {
+			break
 		}
-		finishJob(taskInfo)
+		//time.Sleep(1 * time.Second)
 	}
+	log.Printf("workers knows that all MAP task DISPATCHER over!!!")
+	mapWg.Wait()
+	log.Printf("workers knows that all MAP task PROCESS over!!!")
+
+	for {
+		taskInfo := getJob()
+		log.Printf("get one job from master %v ...... \n", taskInfo)
+		if taskInfo.TaskType == TaskTypeReduce {
+			reduceWg.Add(1)
+			go func() {
+				defer reduceWg.Done()
+				handleReduceTask(reducef, taskInfo)
+			}()
+		} else if taskInfo.TaskType == TaskTypeReduceDispatchedOver {
+			break
+		}
+	}
+	log.Printf("workers knows that all REDUCE task DISPATCHER over!!!")
+	reduceWg.Wait()
+	log.Printf("workers knows that all REDUCE task PROCESS over!!!")
+
+	return
 }
 
 func handleMapTask(mapf func(string, string) []KeyValue, taskInfo GetTaskReply) {
@@ -50,6 +80,7 @@ func handleMapTask(mapf func(string, string) []KeyValue, taskInfo GetTaskReply) 
 	kva := mapf(taskInfo.MapTaskInfo.FileName, string(content))
 	saveIntermediateFile(taskInfo.TaskNum, taskInfo.MapTaskInfo.NReduce, kva)
 	log.Printf("map task %v done \n", taskInfo.MapTaskInfo.FileName)
+	finishJob(taskInfo)
 }
 
 // for sorting by key.
@@ -113,7 +144,8 @@ func handleReduceTask(reducef func(string, []string) string, taskInfo GetTaskRep
 
 	ofile.Close()
 
-	log.Printf("map task %v done \n", taskInfo.TaskNum)
+	log.Printf("reduce task %v done \n", taskInfo.TaskNum)
+	finishJob(taskInfo)
 }
 
 func saveIntermediateFile(n int64, nReduce int, kva []KeyValue) {
@@ -160,7 +192,7 @@ func getJob() GetTaskReply {
 	args := GetTaskArgs{}
 	reply := GetTaskReply{}
 	call("Master.GetJob", &args, &reply)
-	log.Printf("get request job %v", reply)
+	log.Printf("get request job %v, %v, %v,%v", reply.TaskType.ToString(), reply.TaskNum, reply.MapTaskInfo, reply.ReduceTaskInfo)
 	return reply
 }
 
@@ -218,6 +250,6 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 		return true
 	}
 
-	fmt.Println(err)
+	panic(err)
 	return false
 }
